@@ -106,7 +106,7 @@ setMethod("sc3", signature(object = "SCESet"), function(object, exprs_values = "
 #' 
 #' @export
 sc3_estimate_k.SCESet <- function(object) {
-    dataset <- object@sc3$processed_dataset
+    dataset <- get_processed_dataset(object)
     if (is.null(dataset)) {
         warning(paste0("Please run sc3_prepare() first!"))
         return(object)
@@ -214,21 +214,19 @@ sc3_prepare.SCESet <- function(object, exprs_values = "counts", gene.filter = TR
     
     # gene filter
     if (gene.filter) {
-        dataset <- gene_filter(dataset, gene.filter.fraction, gene.reads.rare, gene.reads.ubiq)
-        if (nrow(dataset) == 0) {
+        object@sc3$gene_filter <- gene_filter(dataset, gene.filter.fraction, gene.reads.rare, gene.reads.ubiq)
+        if (all(!object@sc3$gene_filter)) {
             message("All genes were removed after the gene filter! Stopping now...")
             return(object)
         }
     }
     
     # log2 transformation
+    object@sc3$take_log <- FALSE
     if (log.scale) {
-        message("log2-scaling...")
-        dataset <- log2(1 + dataset)
+        object@sc3$take_log <- TRUE
     }
-    
-    object@sc3$processed_dataset <- dataset
-    
+
     object@sc3$kmeans_iter_max <- k.means.iter.max
     object@sc3$rand_seed <- seed
     
@@ -250,8 +248,6 @@ sc3_prepare.SCESet <- function(object, exprs_values = "counts", gene.filter = TR
     if (length(n.dim) > 15) {
         n.dim <- sample(n.dim, 15)
     }
-    
-    object@sc3$n_dim <- n.dim
     
     # prepare for SVM
     if (!is.null(svm.num.cells) | !is.null(svm.train.inds) | ncol(dataset) > svm.max) {
@@ -279,7 +275,25 @@ sc3_prepare.SCESet <- function(object, exprs_values = "counts", gene.filter = TR
         
         object@sc3$svm_train_inds <- tmp$svm.train.inds
         object@sc3$svm_study_inds <- tmp$svm.study.inds
+        
+        # update kmeans_nstart after defining SVM training indeces
+        if (is.null(k.means.nstart)) {
+            if (length(tmp$svm.train.inds) <= 2000) {
+                object@sc3$kmeans_nstart <- 1000
+            }
+        } else {
+            object@sc3$kmeans_nstart <- k.means.nstart
+        }
+        
+        # update the region of dimensions
+        n.dim <- floor(d.region.min * length(tmp$svm.train.inds)):ceiling(d.region.max * length(tmp$svm.train.inds))
+        # for large datasets restrict the region of dimensions to 15
+        if (length(n.dim) > 15) {
+            n.dim <- sample(n.dim, 15)
+        }
     }
+    
+    object@sc3$n_dim <- n.dim
     
     # register computing cluster (N-1 CPUs) on a local machine
     if (is.null(n.cores)) {
@@ -372,7 +386,7 @@ setMethod("sc3_set_ks", signature(object = "SCESet"), function(object, ks = NULL
 #' 
 #' @export
 sc3_calc_dists.SCESet <- function(object) {
-    dataset <- object@sc3$processed_dataset
+    dataset <- get_processed_dataset(object)
     if (is.null(dataset)) {
         warning(paste0("Please run sc3_prepare() first!"))
         return(object)
@@ -540,6 +554,9 @@ sc3_kmeans.SCESet <- function(object) {
     
     n.cores <- object@sc3$n_cores
     
+    kmeans_iter_max <- object@sc3$kmeans_iter_max
+    kmeans_nstart <- object@sc3$kmeans_nstart
+    
     cl <- parallel::makeCluster(n.cores, outfile = "")
     doParallel::registerDoParallel(cl, cores = n.cores)
     
@@ -552,7 +569,7 @@ sc3_kmeans.SCESet <- function(object) {
                 utils::setTxtProgressBar(pb, i)
                 transf <- get(hash.table$transf[i], transfs)
                 stats::kmeans(transf[, 1:hash.table$n.dim[i]], hash.table$ks[i], 
-                  iter.max = object@sc3$kmeans_iter_max, nstart = object@sc3$kmeans_nstart)$cluster
+                  iter.max = kmeans_iter_max, nstart = kmeans_nstart)$cluster
             })
         }
     
@@ -696,7 +713,7 @@ sc3_calc_biology.SCESet <- function(object) {
         return(object)
     }
     
-    dataset <- object@sc3$processed_dataset
+    dataset <- get_processed_dataset(object)
     # check whether in the SVM regime
     if (!is.null(object@sc3$svm_train_inds)) {
         dataset <- dataset[, object@sc3$svm_train_inds]
@@ -773,7 +790,7 @@ sc3_run_svm.SCESet <- function(object, k) {
         return(object)
     }
     
-    dataset <- object@sc3$processed_dataset
+    dataset <- get_processed_dataset(object)
     hc <- object@sc3$consensus[[as.character(k)]]$hc
     clusts <- get_clusts(hc, k)
     

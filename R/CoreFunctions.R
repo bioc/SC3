@@ -21,14 +21,12 @@
 #' less than fraction*N cells (rare genes)
 #' @param reads.ubiq expression value threshold for genes that are expressed in
 #' more than (1-fraction)*N cells (ubiquitous genes)
-#' @return filtered expression matrix some genes were removed.
+#' @return a boolean vector representing the gene filter
 gene_filter <- function(data, fraction = 0.06, reads.rare = 2, reads.ubiq = 0) {
-    message("Gene filtering...")
     frac.cells <- ceiling(fraction * ncol(data))
-    d <- data[rowSums(data > reads.rare) >= frac.cells & rowSums(data > reads.ubiq) <= 
-        ncol(data) - frac.cells, ]
-    d <- unique(d)
-    return(d)
+    res <- rowSums(data > reads.rare) >= frac.cells & rowSums(data > reads.ubiq) <= 
+        ncol(data) - frac.cells
+    return(res)
 }
 
 #' Calculate a distance matrix
@@ -203,7 +201,11 @@ make_col_ann_for_heatmaps <- function(object, show_pdata) {
         }
     }
     ann <- NULL
-    ann <- object@phenoData@data[, colnames(object@phenoData@data) %in% show_pdata]
+    if(is.null(object@sc3$svm_train_inds)) {
+        ann <- object@phenoData@data[, colnames(object@phenoData@data) %in% show_pdata]
+    } else {
+        ann <- object@phenoData@data[object@sc3$svm_train_inds, colnames(object@phenoData@data) %in% show_pdata]
+    }
     # remove columns with 1 value only
     if (length(show_pdata) > 1) {
         tmp <- ann[, unlist(lapply(ann, function(x) {
@@ -267,3 +269,35 @@ create_sceset <- function(d) {
     d_sceset <- scater::newSCESet(countData = d_cell_exprs, phenoData = pd)
 }
 
+
+#' Get processed dataset used by SC3 from the default scater slots
+#' 
+#' Takes data from the 'exprs_values' slot, applies gene filter and log
+#' transformation.
+#' 
+#' @param object an object of 'SCESet' class
+#' @param exprs_values character string 
+#' indicating which values should be used
+#' as the expression values for SC3 clustering. Valid arguments are \code{'tpm'}
+#' (default; transcripts per million), \code{'norm_tpm'} (normalised TPM
+#' values), \code{'fpkm'} (FPKM values), \code{'norm_fpkm'} (normalised FPKM
+#' values), \code{'counts'} (counts for each feature), \code{'norm_counts'},
+#' \code{'cpm'} (counts-per-million), \code{'norm_cpm'} (normalised
+#' counts-per-million), \code{'exprs'} (whatever is in the \code{'exprs'} slot
+#' of the \code{SCESet} object; default), \code{'norm_exprs'} (normalised
+#' expression values) or \code{'stand_exprs'} (standardised expression values)
+#' or any other named element of the \code{assayData} slot of the \code{SCESet}
+#' object that can be accessed with the \code{get_exprs} function.
+#'
+#' @export
+get_processed_dataset <- function(object, exprs_values = "counts") {
+    dataset <- object@assayData[[exprs_values]]
+    if(!is.null(object@sc3$gene_filter)) {
+        dataset <- dataset[object@sc3$gene_filter, ]
+        dataset <- unique(dataset)
+    }
+    if(object@sc3$take_log) {
+        dataset <- log2(dataset + 1)
+    }
+    return(dataset)
+}
