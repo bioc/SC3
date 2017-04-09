@@ -55,6 +55,7 @@ sceset <- newSCESet(fpkmData = tmp, phenoData = pd, logExprsOffset = 1)
 
 It is also essential for `SC3` that the QC metrics is computed for the created object:
 ```{r}
+is_exprs(sceset) <- exprs(sceset) > 0
 sceset <- calculateQCMetrics(sceset)
 ```
 
