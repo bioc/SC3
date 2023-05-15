@@ -3,7 +3,7 @@ title: "SC3 package manual"
 author: "Vladimir Kiselev"
 date: "`r Sys.Date()`"
 output:
-    rmarkdown::html_document:
+    BiocStyle::html_document:
         toc: true
 vignette: >
   %\VignetteIndexEntry{SC3 package manual}
