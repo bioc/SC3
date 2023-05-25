@@ -1,7 +1,7 @@
 Package: SC3
 Type: Package
 Title: Single-Cell Consensus Clustering
-Version: 1.28.2
+Version: 1.28.3
 Author: Vladimir Kiselev
 Maintainer: Vladimir Kiselev <vladimir.yu.kiselev@gmail.com>
 Authors@R: c(person("Vladimir", "Kiselev",
@@ -15,7 +15,6 @@ Authors@R: c(person("Vladimir", "Kiselev",
              role=c("aut")))
 Description: A tool for unsupervised clustering and analysis of single cell RNA-Seq data.
 License: GPL-3
-Suggests: BiocStyle
 Imports: graphics, stats, utils, methods, e1071, parallel, foreach,
           doParallel, doRNG, shiny, ggplot2, pheatmap (>= 1.0.8),
           ROCR, robustbase, rrcov, cluster, WriteXLS,
@@ -25,7 +24,7 @@ Depends: R(>= 3.3)
 LinkingTo: Rcpp, RcppArmadillo
 LazyData: TRUE
 RoxygenNote: 6.0.1
-Suggests: knitr, rmarkdown, mclust, scater
+Suggests: knitr, rmarkdown, mclust, scater, BiocStyle
 VignetteBuilder: knitr
 biocViews: ImmunoOncology, SingleCell, Software, Classification, Clustering, DimensionReduction, 
             SupportVectorMachine, RNASeq, Visualization, Transcriptomics, 
